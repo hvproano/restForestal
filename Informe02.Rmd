@@ -1,0 +1,128 @@
+---
+title: "Restauración"
+author: "PROAmazonía"
+date: "31/5/2021"
+output: html_document
+params:
+  DateInic:
+    format: "yyyy-mm-dd"
+    input: date
+    value: !r Sys.Date()
+    label: "Fecha de inicio"
+    min: "2021-05-31"
+  DateFin:
+    format: "yyyy-mm-dd"
+    input: date
+    value: !r Sys.Date()
+    label: "Fecha de fin"
+    min: "2021-05-31"
+  tecnico:
+    label: "Responsable"
+    input: select
+    choices: ["Todos", "Alejandro", "Vladimir", "Fernando"]
+    value: "Todos"
+---
+
+```{r setup, include=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,
+  message = FALSE,
+  warning = FALSE
+)
+#library(devtools)
+library(googlesheets4)
+library(dplyr)
+library(sqldf)
+library(DT)
+library(shiny)
+
+url <- "https://docs.google.com/spreadsheets/d/1oSbMvXT5j4SgNWQQJ_GmzvNcsfLC7vBzl6HzeCCvP6s/edit?usp=sharing"
+
+urlResponsable <- "https://docs.google.com/spreadsheets/d/1BYYnfD9dgpkjJJjx0b-gdMQy56Gr7AZQ4mhaKjnWgvE/edit?usp=sharing"
+
+formulario <- read_sheet(url)
+plantas <- read_sheet(url, sheet = "data-InfoPlantas")
+
+responsable <- read_sheet(urlResponsable)
+
+```
+
+
+```{r prepara, echo = FALSE, message=FALSE, warning=FALSE}
+
+  fechaInicio <- params$DateInic - 2
+  fechaFin <- params$DateFin
+  tecnico <- params$tecnico
+  
+  TodosTecnicos <- FALSE
+
+formulario <- formulario %>%
+  filter(as.Date(`data-today`) >= fechaInicio & 
+                  as.Date(`data-today`) <= fechaFin)
+
+# ifelse(tecnico == "Todos", TodosTecnicos <- TRUE, cedulaTecnico <- responsable[responsable$Nombre == tecnico,]$cedula)
+
+if(tecnico == "Todos"){
+  TodosTecnicos <- TRUE
+} else {
+  cedulaTecnico <- responsable[responsable$Nombre == tecnico,]$cedula
+}
+
+if(!TodosTecnicos){
+  formulario <- formulario[formulario$`data-usuario` == cedulaTecnico,]
+}
+
+plantas <- plantas[plantas$PARENT_KEY %in% formulario$KEY,]
+
+# En este punto plantas y formulario está con el filtro de usuario y de fechas
+
+```
+
+## Formulario de monitoreo
+
+En el marco del proceso de restauración forestal, se ha firmado convenios con distintas comunidades, el proceso de monitoreo lo lleva a cabo la fundación ALTRÓPICO.
+
+`r 
+if(fechaInicio == fechaFin) {
+  paste0("En el día ", fechaInicio)
+} else
+  paste0("En el período comprendido entre ",fechaInicio," y ",fechaFin)
+`, y considerando la información levantada`r 
+if(TodosTecnicos){" por todos los técnicos"}`, el número de registros corresponde a `r nrow(formulario)` formularios, y el número total de plantas verificadas es de `r nrow(plantas)`.
+
+
+```{r}
+formulario %>%
+  select(3,5,12,13,11,14:28,30) %>%
+  datatable(rownames = FALSE, 
+            colnames = c('Fecha','Provincia','Comuna/Organización','Comunidad','Dirección','Beneficiario',
+                         'Cédula', 'Número de predio', 'Área a ser restaurada', 'Área de la muestra', 
+                         'Número de plantas a ser consideradas','Punto 1 latitud', 'Punto 1 longitud',
+                         'Punto 2 latitud', 'Punto 2 longitud', 'Punto 3 latitud', 'Punto 3 longitud',
+                         'Punto 4 latitud', 'Punto 4 longitud', 'Acción a monitorear', 'Observaciones'
+                         ),
+            extensions = 'Buttons',
+            options = list(dom = 'Bfrtip',
+                           pageLength=10,
+                           extensions = 'FixedColumns',
+                           scrollX=T,
+                           buttons = c('copy', 'csv', 'excel'),
+                           initComplete = htmlwidgets::JS(
+                           "function(settings, json) {",
+                           paste0("$(this.api().table().container()).css({'font-size': '", 6,
+                                  "'});"
+                                  ),
+                           "}")
+                           )
+  )
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
